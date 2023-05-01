@@ -1,0 +1,30 @@
+pipeline{
+    agent { label 'worker' }   
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '1'))
+    }
+    parameters { string(name: 'DEPLOY', defaultValue: 'staging', description: '') }
+    }
+    stages{
+        stage('build')
+        {
+            steps{
+                sh """
+                cat Dockerfile
+                docker build -t 793313841949.dkr.ecr.us-east-1.amazonaws.com/node-app:v${BUILD_NUMBER} .
+                aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 793313841949.dkr.ecr.us-east-1.amazonaws.com
+                docker push 793313841949.dkr.ecr.us-east-1.amazonaws.com/node-app:v${BUILD_NUMBER}
+                 """
+            }
+        }
+        stage('deploy')
+        {
+            steps{
+                    sshagent(credentials:['Login_App']){
+                      
+                        sh 'ssh -t -t ubuntu@10.0.1.110 -o StrictHostKeyChecking=no "aws ecr get-login-password --region us-east-1 |docker login --username AWS --password-stdin 793313841949.dkr.ecr.us-east-1.amazonaws.com && docker run -d -p 8081:8081 --name nodeapp 793313841949.dkr.ecr.us-east-1.amazonaws.com/node-app:v${BUILD_NUMBER}"'
+                   }
+            }
+        }
+    }
+}
